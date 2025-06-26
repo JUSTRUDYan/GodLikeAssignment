@@ -11,6 +11,8 @@ import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Particle
 import org.bukkit.block.Block
+import org.bukkit.enchantments.Enchantment
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
@@ -87,38 +89,48 @@ class ItemInteractController(
         if (!hasCustomEnchantment(item, key) || !isOre(block)) return
 
         if (config.isAutoDiggingEnabled) {
-            handleAutoDigging(block, item)
+            handleAutoDigging(block, item, player)
         } else {
-            handleSingleBlockDigging(block, item)
+            handleSingleBlockDigging(block, item, player)
         }
     }
 
-    private fun handleAutoDigging(startBlock: Block, item: ItemStack) {
+    private fun handleAutoDigging(startBlock: Block, item: ItemStack, player: Player) {
         val visited = mutableSetOf<Block>()
         val blocksToBreak = findOreCluster(startBlock, visited)
             .take(maxBlockCount)
 
         for (oreBlock in blocksToBreak) {
             if (config.isSmeltingEnabled) {
-                smeltAndBreak(oreBlock, item)
+                smeltAndBreak(oreBlock, item, player)
             } else {
                 breakNaturally(oreBlock, item)
             }
         }
     }
 
-    private fun handleSingleBlockDigging(block: Block, item: ItemStack) {
+    private fun handleSingleBlockDigging(block: Block, item: ItemStack, player: Player) {
         if (config.isSmeltingEnabled) {
-            smeltAndBreak(block, item)
+            smeltAndBreak(block, item, player)
         } else {
             breakNaturally(block, item)
         }
     }
 
-    private fun smeltAndBreak(block: Block, item: ItemStack) {
+    private fun smeltAndBreak(block: Block, item: ItemStack, player: Player) {
         val drop = getSmeltedDrop(block.type)
         if (drop != null) {
-            block.world.dropItemNaturally(block.location, ItemStack(drop))
+            val fortuneLevel = item.enchantments[Enchantment.LOOT_BONUS_BLOCKS] ?: 0
+            val dropsCount = calculateFortuneDrops(fortuneLevel)
+
+            val inventory = player.inventory
+            for (i in 1..dropsCount) {
+                val leftover = inventory.addItem(ItemStack(drop))
+                leftover.values.forEach {
+                    block.world.dropItemNaturally(block.location, it)
+                }
+            }
+
             block.type = Material.AIR
         } else {
             breakNaturally(block, item)
@@ -129,6 +141,13 @@ class ItemInteractController(
     private fun breakNaturally(block: Block, item: ItemStack) {
         block.breakNaturally(item)
         spawnParticlesAtLocation(block.location)
+    }
+
+    private fun calculateFortuneDrops(fortuneLevel: Int): Int {
+        if (fortuneLevel == 0) return 1
+
+        val multiplier = (1..fortuneLevel + 1).random()
+        return multiplier
     }
 
     fun isOre(block: Block): Boolean {
