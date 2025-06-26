@@ -1,0 +1,11 @@
+name: AutoSmeltingVeinMiner
+version: 1.0-SNAPSHOT
+main: lucya.org.autoSmeltingVeinMiner.AutoSmeltingVeinMiner
+api-version: '1.20'
+
+commands:
+  rune:
+    description: Give a rune to a player.
+    usage: /rune give <player> <type>
+    permission: rune.give
+    permission-message: You do not have permission to use this command.
